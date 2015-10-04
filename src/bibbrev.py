@@ -79,27 +79,29 @@ def main():
         "/journal_files/journal_abbreviations_general.txt",
         reverse=args.reverse)
 
+    # Assume that if it has a journal key, then it needs abbreviating.  I'm doing this
+    # instead of testing for type==article in case I've forgotten about a case where
+    # type != article but there's a journal field.
+    # Also, journal names with one word ('Nature') don't require
+    # abbreviation.
+    refs = {key: ref for key, ref in refs.items() if 'journal' in ref}
+    refs = {key: ref for key, ref in refs.items()
+            if len(ref['journal'].split(' ')) > 1}
+
     for ref in refs:
-        if 'journal' in refs[ref]:
-            # Assume that if it has a journal key, then it needs abbreviating.  I'm doing this
-            # instead of testing for type==article in case I've forgotten about a case where
-            # type != article but there's a journal field.
-            # Also, journal names with one word ('Nature') don't require
-            # abbreviation.
-            if len(refs[ref]['journal'].split(' ')) > 1:
-                journal = refs[ref]['journal'].lower()
+        journal = refs[ref]['journal'].lower()
 
-                # Handle any difficult characters.  TODO: check that this list
-                # is complete.
-                journal_clean = re.sub('[{}]', '', journal)
+        # Handle any difficult characters.  TODO: check that this list
+        # is complete.
+        journal_clean = re.sub('[{}]', '', journal)
 
-                try:
-                    refs[ref]['journal'] = abbrevs[journal_clean]
-                    logger.info('%s replaced with %s for key %s' %
-                                (journal, abbrevs[journal_clean], ref))
-                except KeyError:
-                    logger.error('%s not found in abbreviations!' %
-                                 (journal_clean))
+        try:
+            refs[ref]['journal'] = abbrevs[journal_clean]
+            logger.info('%s replaced with %s for key %s' %
+                        (journal, abbrevs[journal_clean], ref))
+        except KeyError:
+            logger.error('%s not found in abbreviations!' %
+                         (journal_clean))
 
     output_bib = to_bibtex(refs_bp)
     output.write(output_bib)
