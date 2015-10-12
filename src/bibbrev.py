@@ -2,12 +2,13 @@ from __future__ import print_function
 from bibtexparser.bparser import BibTexParser
 from bibtexparser.customization import homogeneize_latex_encoding
 from bibtexparser.bwriter import to_bibtex
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 import os
 import sys
 import codecs
 import logging
 import re
+from fuzzywuzzy import fuzz
 
 logging.basicConfig()
 logger = logging.getLogger('bibbreviate')
@@ -45,7 +46,44 @@ def load_abbrevs(fn, reverse=False):
     return abbrevs
 
 
+def fuzzymatch(name, choices, algo, minm=0):
+    """Return best match to name from choices.
+
+    Args
+    --------------------------------
+    Name: str, String to match
+    Choices: List of strings to compare to
+    algo: Callable that returns a float between 0 and 100 represnsenting the
+        match score (eg. fuzzywuzzy functions)
+    minm: The minimum match score that is considered a positive match
+
+    Returns
+    --------------------------------
+    The string in choices with the highest match score, if score >= minm,
+    else None.
+
+    """
+
+    scores = [(algo(name, choice), choice) for choice in choices]
+    scores.sort()
+    bestscore, bestchoice = scores[0]
+    if bestscore >= minm:
+        return bestchoice
+    else:
+        return None
+
+
 def main():
+
+    def argint_0_100(arg):
+        """Validate input is a float between 0 and 1"""
+        try:
+            if arg >= 0 and arg <= 100:
+                return int(arg)
+        except:
+            pass
+        raise ArgumentTypeError("SCORE should be bewteen 0 and 100")
+
     parser = ArgumentParser()
     parser.add_argument("target", help="The bib file to abbreviate.")
     parser.add_argument(
@@ -62,6 +100,26 @@ def main():
         "--abbreviations",
         help="Path to a file of abbreviations in the form (one per line): Journal of Biological Science = J. Sci. Biol.")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "-m",
+        "--match-algorithm",
+        help="""Matching algorithm selection for journal names. This should
+            be "exact" (default) or a function name from fuzzywuzzy.fuzz""",
+        default='exact',
+        metavar='ALGO',
+        choices=('exact', 'ratio', 'partial_ratio',
+                 'token_sort_ratio', 'token_set_ratio'
+                 )
+        )
+    parser.add_argument(
+        '-s',
+        '--min-match',
+        help="int between 0 and 100: Minimum match score value to be\
+              considered a match (applied to fuzzy matching only)",
+        default=80,
+        metavar='SCORE',
+        type=argint_0_100,
+        )
 
     args = parser.parse_args()
 
@@ -95,8 +153,16 @@ def main():
         # is complete.
         journal_clean = re.sub('[{}]', '', journal)
 
+        # Journal name matching
+        if args.match_algorithm == 'exact':
+            journal_match = journal_clean
+        else:
+            algfun = getattr(fuzz, args.match_algorithm)
+            journal_match = fuzzymatch(journal_clean, abbrevs.keys(),
+                                       algfun, args.min_match)
+
         try:
-            refs[ref]['journal'] = abbrevs[journal_clean]
+            refs[ref]['journal'] = abbrevs[journal_match]
             logger.info('%s replaced with %s for key %s' %
                         (journal, abbrevs[journal_clean], ref))
         except KeyError:
