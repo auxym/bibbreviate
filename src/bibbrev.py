@@ -60,7 +60,12 @@ def main():
     parser.add_argument(
         "-a",
         "--abbreviations",
-        help="Path to a file of abbreviations in the form (one per line): Journal of Biological Science = J. Sci. Biol.")
+        help="Path to a file of abbreviations in the form (one per line): Journal of Biological Science = J. Sci. Biol.",
+        default=os.path.join(determine_path(),
+                             "journal_files",
+                             "journal_abbreviations_general.txt",
+                             )
+        )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -74,10 +79,8 @@ def main():
     refs_bp = BibTexParser(
         input.read(), customization=homogeneize_latex_encoding)
     refs = refs_bp.get_entry_dict()
-    abbrevs = load_abbrevs(
-        determine_path() +
-        "/journal_files/journal_abbreviations_general.txt",
-        reverse=args.reverse)
+
+    abbrevs = load_abbrevs(args.abbreviations, reverse=args.reverse)
 
     # Assume that if it has a journal key, then it needs abbreviating.  I'm doing this
     # instead of testing for type==article in case I've forgotten about a case where
