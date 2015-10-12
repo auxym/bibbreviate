@@ -1,6 +1,7 @@
 from __future__ import print_function
 from bibtexparser.bparser import BibTexParser
 from bibtexparser.customization import homogeneize_latex_encoding
+from bibtexparser.customization import convert_to_unicode
 from bibtexparser.bwriter import to_bibtex
 from argparse import ArgumentParser
 import os
@@ -8,6 +9,7 @@ import sys
 import codecs
 import logging
 import re
+from copy import copy
 
 logging.basicConfig()
 logger = logging.getLogger('bibbreviate')
@@ -76,8 +78,7 @@ def main():
     input = open(args.target, "r")
     output = open(args.output, "w") if args.output else sys.stdout
 
-    refs_bp = BibTexParser(
-        input.read(), customization=homogeneize_latex_encoding)
+    refs_bp = BibTexParser(input.read())
     refs = refs_bp.get_entry_dict()
 
     abbrevs = load_abbrevs(args.abbreviations, reverse=args.reverse)
@@ -92,7 +93,7 @@ def main():
             if len(ref['journal'].split(' ')) > 1}
 
     for ref in refs:
-        journal = refs[ref]['journal'].lower()
+        journal = convert_to_unicode(copy(refs[ref]))['journal'].lower()
 
         # Handle any difficult characters.  TODO: check that this list
         # is complete.
